@@ -59,8 +59,8 @@ input_data = pd.DataFrame([{
     "MonthlyIncome": MonthlyIncome,
 }])
 
-# Same threshold that was used to evaluate the model in train.py
-classification_threshold = 0.45
+# Threshold selected by train.py from out-of-fold predictions on the training set
+classification_threshold = 0.50
 
 if st.button("Predict"):
     prob = model.predict_proba(input_data)[0, 1]
