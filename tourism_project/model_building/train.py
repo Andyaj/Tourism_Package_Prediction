@@ -1,10 +1,11 @@
 import os
+import numpy as np
 import pandas as pd
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import make_pipeline
 import xgboost as xgb
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import GridSearchCV, cross_val_predict
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import joblib
 import mlflow
@@ -78,8 +79,13 @@ with mlflow.start_run():
 
     best_model = grid_search.best_estimator_
 
-    # Classification threshold applied to the predicted purchase probability
-    classification_threshold = 0.45
+    # Choose the classification threshold from out-of-fold predictions on the training set.
+    # The test set is not used for this choice and is kept for the final evaluation.
+    threshold_grid = [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
+    oof_proba = cross_val_predict(best_model, Xtrain, ytrain, cv=5, method="predict_proba")[:, 1]
+    oof_f1 = [f1_score(ytrain, (oof_proba >= t).astype(int)) for t in threshold_grid]
+    classification_threshold = threshold_grid[int(np.argmax(oof_f1))]
+    print(f"Classification threshold selected on the training folds: {classification_threshold}")
 
     y_pred_train_proba = best_model.predict_proba(Xtrain)[:, 1]
     y_pred_train = (y_pred_train_proba >= classification_threshold).astype(int)
@@ -102,7 +108,6 @@ with mlflow.start_run():
         "test_f1-score": test_report["1"]["f1-score"],
     })
 
-    print(f"\nClassification threshold: {classification_threshold}")
     print("\nTrain classification report:")
     print(classification_report(ytrain, y_pred_train))
     print("Test classification report:")
